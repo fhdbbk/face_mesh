@@ -21,6 +21,7 @@ cap = cv2.VideoCapture(0)
 while True:
   
     _, image = cap.read()
+    image = cv2.flip(image, 1)
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     rects = detector(gray, 0)

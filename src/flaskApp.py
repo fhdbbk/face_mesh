@@ -1,6 +1,13 @@
 from flask import Flask, render_template, Response
 import cv2
+import numpy as np
+import dlib
 import os
+from pathlib import Path
+
+BASE_DIR = Path(os.path.abspath(__file__)).parent.parent
+
+p = BASE_DIR / "models/dlib/shape_predictor_68_face_landmarks.dat"
 
 app = Flask(__name__)
 
@@ -8,6 +15,16 @@ app = Flask(__name__)
 # https://stackoverflow.com/questions/61047207/opencv-videocapture-does-not-work-in-flask-project-but-works-in-basic-example
 if os.environ.get('WERKZEUG_RUN_MAIN') or Flask.debug is False:
     cap = cv2.VideoCapture(0)
+
+detector = dlib.get_frontal_face_detector()
+predictor = dlib.shape_predictor(str(p))
+
+def shape_to_np(shape, dtype="int"):
+	coords = np.zeros((68, 2), dtype=dtype)
+	for i in range(0, 68):
+		coords[i] = (shape.part(i).x, shape.part(i).y)
+	
+	return coords
 
 
 def gen_frames(camera):  
@@ -17,6 +34,20 @@ def gen_frames(camera):
         if not success:
             break
         else:
+            frame = cv2.flip(frame, 1)
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            rects = detector(gray, 0)
+            for (i, rect) in enumerate(rects):
+                x1 = rect.left()
+                y1 = rect.top()
+                x2 = rect.right()
+                y2 = rect.bottom()
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 5)
+                shape = predictor(gray, rect)
+                shape = shape_to_np(shape)
+
+                for (x, y) in shape:
+                    cv2.circle(frame, (x, y), 2, (0, 0, 255), -1)
             ret, buffer = cv2.imencode('.jpg', frame)
             frame = buffer.tobytes()
             yield (b'--frame\r\n'
